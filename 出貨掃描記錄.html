@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="出貨掃描">
 <title>出貨掃描記錄</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
@@ -21,13 +20,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 video { width: 100%; height: 220px; object-fit: cover; border-radius: 10px; background: #111; display: block; }
 .scan-overlay { position: relative; }
 .scan-frame { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 150px; height: 150px; pointer-events: none; }
-.sf-tl, .sf-tr, .sf-bl, .sf-br { position: absolute; width: 30px; height: 30px; border-color: white; border-style: solid; border-radius: 4px; }
+.sf-tl, .sf-tr, .sf-bl, .sf-br { position: absolute; width: 30px; height: 30px; border-color: #4ade80; border-style: solid; }
 .sf-tl { top:0; left:0; border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
 .sf-tr { top:0; right:0; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
 .sf-bl { bottom:0; left:0; border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
 .sf-br { bottom:0; right:0; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
-.scan-line { position: absolute; left: 10px; right: 10px; height: 2px; background: rgba(255,100,100,0.8); animation: scanMove 2s linear infinite; }
+.scan-line { position: absolute; left: 10px; right: 10px; height: 2px; background: rgba(74,222,128,0.8); animation: scanMove 1.5s linear infinite; }
 @keyframes scanMove { 0%{top:10px} 100%{top:130px} }
+.scan-status { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; font-size: 12px; color: white; background: rgba(0,0,0,0.45); padding: 4px 0; border-radius: 0 0 10px 10px; }
 .result-box { background: #f5f7fa; border-radius: 10px; padding: 10px 12px; font-size: 14px; display: flex; align-items: center; gap: 8px; margin-top: 10px; min-height: 44px; }
 .result-label { font-size: 11px; color: #888; }
 .result-value { font-weight: 600; color: #1a56a0; font-size: 15px; }
@@ -41,7 +41,6 @@ textarea { resize: none; height: 68px; }
 .btn-primary:active { background: #144080; }
 .btn-secondary { background: #f0f4f8; color: #444; border: 1px solid #ddd; }
 .btn-green { background: #2e7d32; color: white; }
-.btn-green:active { background: #1b5e20; }
 .tab-bar { display: flex; gap: 6px; margin-bottom: 12px; }
 .tab { flex: 1; padding: 10px 6px; border-radius: 10px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid #ddd; background: #f0f4f8; color: #666; text-align: center; }
 .tab.active { background: #1a56a0; color: white; border-color: #1a56a0; }
@@ -64,6 +63,8 @@ textarea { resize: none; height: 68px; }
 .section-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-row .card-title { margin: 0; }
 .export-btn { font-size: 12px; padding: 6px 12px; border-radius: 8px; border: 1px solid #ddd; background: #f0f4f8; color: #444; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+.detected { animation: flash 0.3s ease; }
+@keyframes flash { 0%{opacity:1} 50%{opacity:0.3} 100%{opacity:1} }
 </style>
 </head>
 <body>
@@ -82,7 +83,6 @@ textarea { resize: none; height: 68px; }
     <div class="tab" onclick="switchTab('settings')"><i class="ti ti-settings"></i> 設定</div>
   </div>
 
-  <!-- 掃描頁 -->
   <div id="tab-scan">
     <div class="card">
       <div class="card-title">QR Code 掃描</div>
@@ -93,6 +93,7 @@ textarea { resize: none; height: 68px; }
           <div class="sf-bl"></div><div class="sf-br"></div>
           <div class="scan-line"></div>
         </div>
+        <div class="scan-status" id="scan-status">對準 QR Code 即可掃描</div>
       </div>
       <div class="result-box">
         <i class="ti ti-qrcode" style="font-size:20px;color:#aaa"></i>
@@ -119,7 +120,6 @@ textarea { resize: none; height: 68px; }
     </div>
   </div>
 
-  <!-- 記錄頁 -->
   <div id="tab-records" style="display:none">
     <div class="card">
       <div class="section-row">
@@ -141,7 +141,6 @@ textarea { resize: none; height: 68px; }
     </button>
   </div>
 
-  <!-- 設定頁 -->
   <div id="tab-settings" style="display:none">
     <div class="card">
       <div class="card-title">Google Sheets 連結</div>
@@ -152,7 +151,6 @@ textarea { resize: none; height: 68px; }
       </button>
       <div id="settings-status" style="margin-top:8px"></div>
     </div>
-
     <div class="card">
       <div class="card-title">如何連結 Google Sheets</div>
       <p class="info-text">
@@ -181,58 +179,116 @@ function doPost(e) {<br>
 
 <div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 let records = JSON.parse(localStorage.getItem('delivery_records') || '[]');
 let scriptUrl = localStorage.getItem('script_url') || '';
-let scanning = true;
-const video = document.getElementById('preview');
-const canvas = document.createElement('canvas');
-const ctx = canvas.getContext('2d');
+let isScanning = false;
+let detector = null;
+let stream = null;
 
-// 初始化
+const video = document.getElementById('preview');
+
 document.getElementById('today-date').textContent = new Date().toLocaleDateString('zh-TW', {year:'numeric',month:'long',day:'numeric',weekday:'short'});
 document.getElementById('script-url').value = scriptUrl;
 updateTime();
 setInterval(updateTime, 1000);
 renderRecords();
-startCamera();
+initScanner();
 
 function updateTime() {
   document.getElementById('time-display').textContent = '記錄時間：' + new Date().toLocaleString('zh-TW');
 }
 
+async function initScanner() {
+  // 優先使用原生 BarcodeDetector API（Android Chrome 支援）
+  if ('BarcodeDetector' in window) {
+    try {
+      detector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'code_39', 'ean_13'] });
+      document.getElementById('scan-status').textContent = '使用原生掃描（高速）';
+      await startCamera();
+      return;
+    } catch(e) {}
+  }
+  // 備用：jsQR
+  loadJsQR();
+}
+
+function loadJsQR() {
+  document.getElementById('scan-status').textContent = '載入掃描模組...';
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+  s.onload = async () => {
+    document.getElementById('scan-status').textContent = '對準 QR Code 即可掃描';
+    await startCamera();
+  };
+  document.head.appendChild(s);
+}
+
 async function startCamera() {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:640},height:{ideal:480}}});
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
     video.srcObject = stream;
-    video.onloadedmetadata = () => requestAnimationFrame(scanLoop);
+    // 開啟連續對焦
+    const track = stream.getVideoTracks()[0];
+    try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch(e) {}
+    video.onloadedmetadata = () => { isScanning = true; scanLoop(); };
   } catch(e) {
-    document.getElementById('scan-result').textContent = '請手動輸入序號';
+    document.getElementById('scan-status').textContent = '相機未授權，請手動輸入';
   }
 }
 
-function scanLoop() {
-  if (!scanning || video.readyState !== video.HAVE_ENOUGH_DATA) { requestAnimationFrame(scanLoop); return; }
-  const vw = video.videoWidth, vh = video.videoHeight;
-  // 只掃中間區域，速度更快
-  const cropW = Math.floor(vw * 0.85);
-  const cropH = Math.floor(vh * 0.85);
-  const cropX = Math.floor((vw - cropW) / 2);
-  const cropY = Math.floor((vh - cropH) / 2);
-  canvas.width = cropW;
-  canvas.height = cropH;
-  ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-  const img = ctx.getImageData(0, 0, cropW, cropH);
-  const code = jsQR(img.data, img.width, img.height, {inversionAttempts:'attemptBoth'});
-  if (code && code.data) {
-    document.getElementById('scan-result').textContent = code.data;
-    document.getElementById('sn-input').value = code.data;
-    scanning = false;
-    showToast('掃描成功：' + code.data);
-    setTimeout(() => { scanning = true; }, 1500);
-  }
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+let lastScan = 0;
+
+async function scanLoop() {
+  if (!isScanning) { requestAnimationFrame(scanLoop); return; }
+  if (video.readyState !== video.HAVE_ENOUGH_DATA) { requestAnimationFrame(scanLoop); return; }
+
+  try {
+    if (detector) {
+      // 原生 BarcodeDetector，直接偵測 video
+      const codes = await detector.detect(video);
+      if (codes.length > 0) {
+        const val = codes[0].rawValue;
+        const now = Date.now();
+        if (val && now - lastScan > 1500) {
+          lastScan = now;
+          onDetected(val);
+        }
+      }
+    } else if (window.jsQR) {
+      // jsQR 備用
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' });
+      if (code && code.data) {
+        const now = Date.now();
+        if (now - lastScan > 1500) {
+          lastScan = now;
+          onDetected(code.data);
+        }
+      }
+    }
+  } catch(e) {}
+
   requestAnimationFrame(scanLoop);
+}
+
+function onDetected(value) {
+  document.getElementById('scan-result').textContent = value;
+  document.getElementById('sn-input').value = value;
+  // 視覺回饋
+  const frame = document.querySelector('.scan-frame');
+  frame.classList.add('detected');
+  setTimeout(() => frame.classList.remove('detected'), 300);
+  showToast('✓ 掃描成功：' + value);
+  // 震動回饋（Android 支援）
+  if (navigator.vibrate) navigator.vibrate(80);
 }
 
 function saveRecord() {
@@ -240,12 +296,7 @@ function saveRecord() {
   if (!sn) { showToast('請輸入或掃描序號！'); return; }
   const note = document.getElementById('note-input').value.trim();
   const now = new Date();
-  const record = {
-    sn, note,
-    date: now.toLocaleDateString('zh-TW'),
-    time: now.toLocaleTimeString('zh-TW'),
-    ts: now.toISOString()
-  };
+  const record = { sn, note, date: now.toLocaleDateString('zh-TW'), time: now.toLocaleTimeString('zh-TW'), ts: now.toISOString() };
   records.unshift(record);
   localStorage.setItem('delivery_records', JSON.stringify(records));
   clearForm();
@@ -260,9 +311,9 @@ function clearForm() {
 }
 
 function switchTab(tab) {
-  ['scan','records','settings'].forEach(t => {
+  ['scan','records','settings'].forEach((t,i) => {
     document.getElementById('tab-'+t).style.display = t===tab ? 'block' : 'none';
-    document.querySelectorAll('.tab')[['scan','records','settings'].indexOf(t)].classList.toggle('active', t===tab);
+    document.querySelectorAll('.tab')[i].classList.toggle('active', t===tab);
   });
   if (tab==='records') renderRecords();
 }
@@ -290,12 +341,10 @@ function exportCSV() {
   records.forEach(r => rows.push([r.sn, r.date, r.time, r.note||'']));
   const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
+  a.href = URL.createObjectURL(blob);
   a.download = '出貨記錄_' + new Date().toLocaleDateString('zh-TW').replace(/\//g,'-') + '.csv';
   a.click();
-  URL.revokeObjectURL(url);
 }
 
 function clearAllRecords() {
@@ -310,17 +359,14 @@ function clearAllRecords() {
 function saveSettings() {
   scriptUrl = document.getElementById('script-url').value.trim();
   localStorage.setItem('script_url', scriptUrl);
-  const el = document.getElementById('settings-status');
-  el.innerHTML = scriptUrl
+  document.getElementById('settings-status').innerHTML = scriptUrl
     ? '<div class="status-msg status-ok"><i class="ti ti-check"></i> 設定已儲存</div>'
-    : '<div class="status-msg status-info">未設定 Google Sheets，僅使用本機儲存</div>';
+    : '<div class="status-msg status-info">未設定，僅使用本機儲存</div>';
 }
 
 async function syncRecord(record) {
   if (!scriptUrl) return;
-  try {
-    await fetch(scriptUrl, {method:'POST', body:JSON.stringify(record), mode:'no-cors'});
-  } catch(e) {}
+  try { await fetch(scriptUrl, {method:'POST', body:JSON.stringify(record), mode:'no-cors'}); } catch(e) {}
 }
 
 async function syncAllToSheets() {
@@ -328,13 +374,8 @@ async function syncAllToSheets() {
   const btn = document.getElementById('sync-btn');
   btn.disabled = true;
   btn.innerHTML = '<i class="ti ti-loader"></i> 同步中...';
-  let ok = true;
-  for (const r of [...records].reverse()) {
-    try { await syncRecord(r); } catch(e) { ok = false; }
-  }
-  document.getElementById('sheets-status').innerHTML = ok
-    ? '<div class="status-msg status-ok">同步完成！共 ' + records.length + ' 筆</div>'
-    : '<div class="status-msg status-err">部分同步失敗，請檢查 Script 網址</div>';
+  for (const r of [...records].reverse()) { try { await syncRecord(r); } catch(e) {} }
+  document.getElementById('sheets-status').innerHTML = '<div class="status-msg status-ok">同步完成！共 ' + records.length + ' 筆</div>';
   btn.disabled = false;
   btn.innerHTML = '<i class="ti ti-brand-google"></i> 同步到 Google Sheets';
 }
