@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="出貨掃描">
+<title>出貨掃描記錄</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f4f8; min-height: 100vh; }
+.app { max-width: 480px; margin: 0 auto; padding: 12px 12px 80px; }
+.header { background: #1a56a0; color: white; border-radius: 14px; padding: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+.header h1 { font-size: 17px; font-weight: 600; }
+.header p { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+.card { background: white; border: 0.5px solid #e0e0e0; border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+.card-title { font-size: 11px; font-weight: 600; color: #888; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.8px; }
+video { width: 100%; height: 220px; object-fit: cover; border-radius: 10px; background: #111; display: block; }
+.scan-overlay { position: relative; }
+.scan-frame { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 150px; height: 150px; pointer-events: none; }
+.sf-tl, .sf-tr, .sf-bl, .sf-br { position: absolute; width: 30px; height: 30px; border-color: white; border-style: solid; border-radius: 4px; }
+.sf-tl { top:0; left:0; border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+.sf-tr { top:0; right:0; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+.sf-bl { bottom:0; left:0; border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+.sf-br { bottom:0; right:0; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+.scan-line { position: absolute; left: 10px; right: 10px; height: 2px; background: rgba(255,100,100,0.8); animation: scanMove 2s linear infinite; }
+@keyframes scanMove { 0%{top:10px} 100%{top:130px} }
+.result-box { background: #f5f7fa; border-radius: 10px; padding: 10px 12px; font-size: 14px; display: flex; align-items: center; gap: 8px; margin-top: 10px; min-height: 44px; }
+.result-label { font-size: 11px; color: #888; }
+.result-value { font-weight: 600; color: #1a56a0; font-size: 15px; }
+label { font-size: 13px; color: #555; display: block; margin-bottom: 5px; margin-top: 10px; }
+input, textarea { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #ddd; background: white; color: #111; font-size: 15px; font-family: inherit; outline: none; }
+input:focus, textarea:focus { border-color: #1a56a0; }
+textarea { resize: none; height: 68px; }
+.time-row { font-size: 12px; color: #888; text-align: right; margin: 6px 0; }
+.btn { width: 100%; padding: 13px; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; }
+.btn-primary { background: #1a56a0; color: white; }
+.btn-primary:active { background: #144080; }
+.btn-secondary { background: #f0f4f8; color: #444; border: 1px solid #ddd; }
+.btn-green { background: #2e7d32; color: white; }
+.btn-green:active { background: #1b5e20; }
+.tab-bar { display: flex; gap: 6px; margin-bottom: 12px; }
+.tab { flex: 1; padding: 10px 6px; border-radius: 10px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid #ddd; background: #f0f4f8; color: #666; text-align: center; }
+.tab.active { background: #1a56a0; color: white; border-color: #1a56a0; }
+.records { display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto; }
+.record-item { background: #f5f7fa; border-radius: 10px; padding: 11px 13px; }
+.record-sn { font-size: 15px; font-weight: 600; color: #111; }
+.record-meta { font-size: 12px; color: #888; margin-top: 3px; }
+.record-note { font-size: 12px; color: #666; margin-top: 3px; font-style: italic; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+.badge-green { background: #e8f5e9; color: #2e7d32; }
+.badge-count { background: #e3f0fb; color: #1a56a0; }
+.empty { text-align: center; color: #aaa; font-size: 14px; padding: 32px 0; }
+.status-msg { padding: 8px 12px; border-radius: 10px; font-size: 13px; margin: 8px 0; }
+.status-ok { background: #e8f5e9; color: #2e7d32; }
+.status-err { background: #fce8e8; color: #c62828; }
+.status-info { background: #e3f0fb; color: #1a56a0; }
+.info-text { font-size: 13px; color: #555; line-height: 1.9; }
+.toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: #222; color: white; padding: 10px 20px; border-radius: 99px; font-size: 13px; z-index: 999; white-space: nowrap; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+.toast.show { opacity: 1; }
+.section-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.section-row .card-title { margin: 0; }
+.export-btn { font-size: 12px; padding: 6px 12px; border-radius: 8px; border: 1px solid #ddd; background: #f0f4f8; color: #444; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <i class="ti ti-package" style="font-size:30px"></i>
+    <div>
+      <h1>出貨掃描記錄</h1>
+      <p id="today-date"></p>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab active" onclick="switchTab('scan')"><i class="ti ti-scan"></i> 掃描</div>
+    <div class="tab" onclick="switchTab('records')"><i class="ti ti-list"></i> 記錄</div>
+    <div class="tab" onclick="switchTab('settings')"><i class="ti ti-settings"></i> 設定</div>
+  </div>
+
+  <!-- 掃描頁 -->
+  <div id="tab-scan">
+    <div class="card">
+      <div class="card-title">QR Code 掃描</div>
+      <div class="scan-overlay">
+        <video id="preview" playsinline autoplay muted></video>
+        <div class="scan-frame">
+          <div class="sf-tl"></div><div class="sf-tr"></div>
+          <div class="sf-bl"></div><div class="sf-br"></div>
+          <div class="scan-line"></div>
+        </div>
+      </div>
+      <div class="result-box">
+        <i class="ti ti-qrcode" style="font-size:20px;color:#aaa"></i>
+        <div>
+          <div class="result-label">掃描結果</div>
+          <div class="result-value" id="scan-result">等待掃描...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">出貨資訊</div>
+      <label>序號</label>
+      <input type="text" id="sn-input" placeholder="掃描或手動輸入序號">
+      <label>備註（選填）</label>
+      <textarea id="note-input" placeholder="例如：客戶名稱、送達地址..."></textarea>
+      <div class="time-row" id="time-display"></div>
+      <button class="btn btn-primary" onclick="saveRecord()">
+        <i class="ti ti-circle-check"></i> 確認出貨記錄
+      </button>
+      <button class="btn btn-secondary" onclick="clearForm()">
+        <i class="ti ti-x"></i> 清除
+      </button>
+    </div>
+  </div>
+
+  <!-- 記錄頁 -->
+  <div id="tab-records" style="display:none">
+    <div class="card">
+      <div class="section-row">
+        <div class="card-title">出貨記錄 <span class="badge badge-count" id="record-count">0</span></div>
+        <button class="export-btn" onclick="exportCSV()">
+          <i class="ti ti-download"></i> 匯出 CSV
+        </button>
+      </div>
+      <div class="records" id="records-list">
+        <div class="empty">尚無記錄</div>
+      </div>
+    </div>
+    <div id="sheets-status"></div>
+    <button class="btn btn-green" id="sync-btn" onclick="syncAllToSheets()" style="display:none">
+      <i class="ti ti-brand-google"></i> 同步到 Google Sheets
+    </button>
+    <button class="btn btn-secondary" onclick="clearAllRecords()" style="margin-top:8px">
+      <i class="ti ti-trash"></i> 清除所有記錄
+    </button>
+  </div>
+
+  <!-- 設定頁 -->
+  <div id="tab-settings" style="display:none">
+    <div class="card">
+      <div class="card-title">Google Sheets 連結</div>
+      <label>Apps Script 網址</label>
+      <input type="url" id="script-url" placeholder="https://script.google.com/macros/s/...">
+      <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:10px">
+        <i class="ti ti-device-floppy"></i> 儲存設定
+      </button>
+      <div id="settings-status" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">如何連結 Google Sheets</div>
+      <p class="info-text">
+        1. 開啟一個 Google 試算表<br>
+        2. 上方選單：<b>擴充功能 → Apps Script</b><br>
+        3. 貼上以下程式碼並儲存：<br><br>
+        <code style="background:#f5f7fa;padding:8px;border-radius:8px;display:block;font-size:11px;line-height:1.8;color:#333">
+function doPost(e) {<br>
+&nbsp;&nbsp;var data = JSON.parse(e.postData.contents);<br>
+&nbsp;&nbsp;var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();<br>
+&nbsp;&nbsp;if (sheet.getLastRow() === 0) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sheet.appendRow(['序號','出貨日期','出貨時間','備註']);<br>
+&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;sheet.appendRow([data.sn, data.date, data.time, data.note||'']);<br>
+&nbsp;&nbsp;return ContentService.createTextOutput('ok');<br>
+}
+        </code><br>
+        4. 點「部署 → 新增部署」<br>
+        5. 類型選「網頁應用程式」<br>
+        6. 執行身分：<b>我</b>，存取權：<b>任何人</b><br>
+        7. 複製網址貼到上方欄位
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+let records = JSON.parse(localStorage.getItem('delivery_records') || '[]');
+let scriptUrl = localStorage.getItem('script_url') || '';
+let scanning = true;
+const video = document.getElementById('preview');
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+
+// 初始化
+document.getElementById('today-date').textContent = new Date().toLocaleDateString('zh-TW', {year:'numeric',month:'long',day:'numeric',weekday:'short'});
+document.getElementById('script-url').value = scriptUrl;
+updateTime();
+setInterval(updateTime, 1000);
+renderRecords();
+startCamera();
+
+function updateTime() {
+  document.getElementById('time-display').textContent = '記錄時間：' + new Date().toLocaleString('zh-TW');
+}
+
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}});
+    video.srcObject = stream;
+    video.onloadedmetadata = () => requestAnimationFrame(scanLoop);
+  } catch(e) {
+    document.getElementById('scan-result').textContent = '請手動輸入序號';
+  }
+}
+
+function scanLoop() {
+  if (!scanning || video.readyState !== video.HAVE_ENOUGH_DATA) { requestAnimationFrame(scanLoop); return; }
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0);
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const code = jsQR(img.data, img.width, img.height, {inversionAttempts:'dontInvert'});
+  if (code && code.data) {
+    document.getElementById('scan-result').textContent = code.data;
+    document.getElementById('sn-input').value = code.data;
+    scanning = false;
+    showToast('掃描成功：' + code.data);
+    setTimeout(() => { scanning = true; }, 2500);
+  }
+  requestAnimationFrame(scanLoop);
+}
+
+function saveRecord() {
+  const sn = document.getElementById('sn-input').value.trim();
+  if (!sn) { showToast('請輸入或掃描序號！'); return; }
+  const note = document.getElementById('note-input').value.trim();
+  const now = new Date();
+  const record = {
+    sn, note,
+    date: now.toLocaleDateString('zh-TW'),
+    time: now.toLocaleTimeString('zh-TW'),
+    ts: now.toISOString()
+  };
+  records.unshift(record);
+  localStorage.setItem('delivery_records', JSON.stringify(records));
+  clearForm();
+  showToast('✓ 已記錄：' + sn);
+  if (scriptUrl) syncRecord(record);
+}
+
+function clearForm() {
+  document.getElementById('sn-input').value = '';
+  document.getElementById('note-input').value = '';
+  document.getElementById('scan-result').textContent = '等待掃描...';
+}
+
+function switchTab(tab) {
+  ['scan','records','settings'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t===tab ? 'block' : 'none';
+    document.querySelectorAll('.tab')[['scan','records','settings'].indexOf(t)].classList.toggle('active', t===tab);
+  });
+  if (tab==='records') renderRecords();
+}
+
+function renderRecords() {
+  const list = document.getElementById('records-list');
+  document.getElementById('record-count').textContent = records.length;
+  document.getElementById('sync-btn').style.display = scriptUrl && records.length ? 'flex' : 'none';
+  if (!records.length) { list.innerHTML = '<div class="empty">尚無出貨記錄</div>'; return; }
+  list.innerHTML = records.map(r => `
+    <div class="record-item">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div class="record-sn">${r.sn}</div>
+        <span class="badge badge-green">${r.date}</span>
+      </div>
+      <div class="record-meta"><i class="ti ti-clock" style="font-size:11px"></i> ${r.time}</div>
+      ${r.note ? `<div class="record-note">備註：${r.note}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function exportCSV() {
+  if (!records.length) { showToast('沒有記錄可以匯出'); return; }
+  const rows = [['序號','出貨日期','出貨時間','備註']];
+  records.forEach(r => rows.push([r.sn, r.date, r.time, r.note||'']));
+  const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '出貨記錄_' + new Date().toLocaleDateString('zh-TW').replace(/\//g,'-') + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function clearAllRecords() {
+  if (!records.length) return;
+  if (!confirm('確定要清除所有 ' + records.length + ' 筆記錄嗎？')) return;
+  records = [];
+  localStorage.setItem('delivery_records', JSON.stringify(records));
+  renderRecords();
+  showToast('已清除所有記錄');
+}
+
+function saveSettings() {
+  scriptUrl = document.getElementById('script-url').value.trim();
+  localStorage.setItem('script_url', scriptUrl);
+  const el = document.getElementById('settings-status');
+  el.innerHTML = scriptUrl
+    ? '<div class="status-msg status-ok"><i class="ti ti-check"></i> 設定已儲存</div>'
+    : '<div class="status-msg status-info">未設定 Google Sheets，僅使用本機儲存</div>';
+}
+
+async function syncRecord(record) {
+  if (!scriptUrl) return;
+  try {
+    await fetch(scriptUrl, {method:'POST', body:JSON.stringify(record), mode:'no-cors'});
+  } catch(e) {}
+}
+
+async function syncAllToSheets() {
+  if (!scriptUrl || !records.length) return;
+  const btn = document.getElementById('sync-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader"></i> 同步中...';
+  let ok = true;
+  for (const r of [...records].reverse()) {
+    try { await syncRecord(r); } catch(e) { ok = false; }
+  }
+  document.getElementById('sheets-status').innerHTML = ok
+    ? '<div class="status-msg status-ok">同步完成！共 ' + records.length + ' 筆</div>'
+    : '<div class="status-msg status-err">部分同步失敗，請檢查 Script 網址</div>';
+  btn.disabled = false;
+  btn.innerHTML = '<i class="ti ti-brand-google"></i> 同步到 Google Sheets';
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+</script>
+</body>
+</html>
